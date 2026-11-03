@@ -21,7 +21,13 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const data = await res.json();
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch {
+        // route didn't return JSON (e.g. 404 HTML) — surface a clean message
+        throw new Error(`Sign-in service returned ${res.status} — check that the API and database are running.`);
+      }
       if (!res.ok) throw new Error(data.error ?? "Sign-in failed");
       router.replace("/");
     } catch (err) {
