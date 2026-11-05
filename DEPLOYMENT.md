@@ -1,72 +1,26 @@
-# Deploying RestaurantOS — Going Live Guide
+# RestaurantOS — Going Live (GitHub Pages & Friends)
 
-## Run it locally (any PC, no setup)
+## GitHub Pages (free, recommended)
 
-```powershell
-git clone https://github.com/<your-username>/restaurantos.git
-cd restaurantos
-npm install
-npm run dev        # http://localhost:3000 — database auto-created + seeded
-```
+One-time setup:
+1. Push the project to a GitHub repository (see README).
+2. Repo → **Settings → Pages → Source: GitHub Actions**.
+3. Push anything to `main` (or run the workflow manually via **Actions → Deploy → Run workflow**).
+4. Visit `https://<username>.github.io/<repo>/` — the restaurant opens, self-initializes, done.
 
----
+The workflow (`.github/workflows/deploy-pages.yml`) sets `VITE_BASE=/<repo-name>/`
+automatically. Routing is hash-based, so page refreshes and direct links always work.
 
-## Go LIVE — Option A: Railway (recommended, easiest)
-
-Railway runs your GitHub repo as a 24/7 website. The repo ships with a
-`Dockerfile` + `railway.json`, so everything is detected automatically.
-
-1. Push the project to GitHub (see README / chat instructions).
-2. Go to **https://railway.app** → sign in with GitHub.
-3. **New Project** → **Deploy from GitHub repo** → pick `restaurantos`.
-4. Railway auto-detects the `Dockerfile` and builds (first build ~3–5 min).
-5. Add a volume so the SQLite database persists across redeploys:
-   your service → **Volumes** → **New Volume** → mount path `/app/data`.
-   Then set a variable so the DB lives on the volume:
-   **Variables** → `DATABASE_URL` = `file:/app/data/local.db`
-6. **Settings → Networking → Generate Domain** → you get a public URL like
-   `restaurantos-production.up.railway.app`.
-7. Open it, sign in: **talhamalikawan@example.com** / **demo1234**.
-
-That's it — live website, real database, simulation engine running 24/7.
-Railway free trial (~$5 credit) covers weeks of demo usage.
-
-## Option B: Render
-
-1. Push to GitHub.
-2. **https://render.com** → **New +** → **Web Service** → connect repo → Runtime: **Docker**.
-3. Free tier works, but note: the filesystem is rebuilt on each deploy
-   (demo data is regenerated automatically on first boot — acceptable for demos).
-
-## Option C: Host it from YOUR PC (100% free, data stays local)
-
-Your own computer becomes the server. The site is live while the PC is on.
+## Local static build (any static host / folder)
 
 ```powershell
-# Terminal 1 — run the production build
-npm run build
-npm run start          # serves on port 3000
-
-# Terminal 2 — free public tunnel (no account needed)
-winget install Cloudflare.cloudflared
-cloudflared tunnel --url http://localhost:3000
+npm run build:vite        # outputs ./dist
+npm run preview:vite      # test the production build locally
 ```
 
-Cloudflare prints a public URL like `https://random-words.trycloudflare.com` —
-share it with anyone. Your data never leaves your machine.
+Upload `dist/` to literally any static host (Netlify Drop, Cloudflare Pages, S3, a USB stick + `npx serve dist`).
 
-## Option D: Docker anywhere (VPS, home server, etc.)
+## Data portability
 
-```bash
-docker build -t restaurantos .
-docker run -d -p 3000:3000 -v restaurantos-data:/app/data \
-  -e DATABASE_URL=file:/app/data/local.db restaurantos
-```
-
----
-
-## What NOT to commit / expose
-
-- `local.db*` — local database (git-ignored; hosts create their own)
-- `.env` — only add it to hosts' env-variable panels if you customize the DB path
-- Never commit real credentials; this project ships with fictional demo data
+- Export/Import via **Storage & Backup** page in the app (JSON, schema-validated).
+- Move between devices by exporting on one and importing on the other.

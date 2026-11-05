@@ -1,8 +1,7 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
-  // @libsql/client ships native binaries — keep it out of the server bundle.
-  serverExternalPackages: ["@libsql/client"],
-};
+// Next.js is used only as the local/preview host. The application itself is a
+// fully client-side, browser-native SPA (Vite build → GitHub Pages).
+const nextConfig: NextConfig = {};
 
 export default nextConfig;
