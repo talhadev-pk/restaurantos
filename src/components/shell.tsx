@@ -75,13 +75,44 @@ export default function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [me, setMe] = useState<Me | null>(null);
   const [checked, setChecked] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const { light, toggle } = useTheme();
 
   useEffect(() => {
-    apiFetch<Me>("/api/auth/me")
-      .then((d) => { setMe(d); setChecked(true); })
-      .catch(() => router.replace("/login"));
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/me");
+        if (res.status === 401) {
+          if (!cancelled) router.replace("/login");
+          return;
+        }
+        if (!res.ok) throw new Error(`Server returned ${res.status}`);
+        const d = (await res.json()) as Me;
+        if (!cancelled) { setMe(d); setChecked(true); }
+      } catch (e) {
+        if (!cancelled) setLoadError(e instanceof Error ? e.message : "Cannot reach the server");
+      }
+    })();
+    return () => { cancelled = true; };
   }, [router]);
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="panel-solid rounded-2xl p-8 max-w-sm text-center space-y-4">
+          <Flame className="text-amber-400 mx-auto" size={28} />
+          <p className="font-display font-bold">Starting up…</p>
+          <p className="text-sm text-muted">The restaurant system is initializing its local database. This takes a few seconds on the very first launch.</p>
+          <button onClick={() => { setLoadError(null); window.location.reload(); }}
+            className="rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-black text-sm font-semibold px-5 py-2.5">
+            Retry
+          </button>
+          <p className="text-[11px] text-faint">{loadError}</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!checked || !me) {
     return (

@@ -13,6 +13,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ action: st
   try {
     const { action } = await ctx.params;
     if (action === "login") {
+      // Safety net: guarantee the local database + demo data exist even if the
+      // boot-time instrumentation hook hasn't run yet (first launch, dev reloads).
+      const { ensureSeeded } = await import("@/db/bootstrap");
+      await ensureSeeded();
       const { email, password } = await req.json();
       if (!email || !password) return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
       const rows = await db
@@ -50,6 +54,8 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ action: st
   try {
     const { action } = await ctx.params;
     if (action !== "me") return NextResponse.json({ error: "Unknown auth action." }, { status: 404 });
+    const { ensureSeeded } = await import("@/db/bootstrap");
+    await ensureSeeded();
     const user = await getSessionUser();
     if (!user) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
     const settings = await getAllSettings();

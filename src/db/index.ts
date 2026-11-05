@@ -11,14 +11,20 @@ const g = globalThis as typeof globalThis & {
 };
 
 const rawUrl = process.env.DATABASE_URL ?? "file:local.db";
+// Some platforms inject a postgres DATABASE_URL automatically — never crash on
+// it. RestaurantOS is local-first: anything that isn't a local/sqlite URL falls
+// back to the project-root database file.
+const url = rawUrl.startsWith("file:") || rawUrl.startsWith("libsql:///") || rawUrl.startsWith("libsql:")
+  ? rawUrl
+  : rawUrl.startsWith("postgres")
+    ? "file:local.db"
+    : `file:${rawUrl}`;
 if (rawUrl.startsWith("postgres")) {
-  throw new Error(
-    "RestaurantOS runs on a local SQLite file. Set DATABASE_URL=file:local.db (or delete it — that is the default).",
-  );
+  console.warn("[db] DATABASE_URL points to PostgreSQL; RestaurantOS uses a local SQLite file — falling back to local.db");
 }
 
 export const sqliteClient: Client =
-  g.__rosSqliteClient ?? createClient({ url: rawUrl.startsWith("file:") || rawUrl.startsWith("libsql:") ? rawUrl : `file:${rawUrl}` });
+  g.__rosSqliteClient ?? createClient({ url });
 
 if (process.env.NODE_ENV !== "production") {
   g.__rosSqliteClient = sqliteClient;

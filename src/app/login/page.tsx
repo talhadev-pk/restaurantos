@@ -29,7 +29,8 @@ export default function LoginPage() {
         throw new Error(`Sign-in service returned ${res.status} — check that the API and database are running.`);
       }
       if (!res.ok) throw new Error(data.error ?? "Sign-in failed");
-      router.replace("/");
+      // Hard navigation guarantees a clean app bootstrap with the fresh session cookie.
+      window.location.assign("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign-in failed");
     } finally {
