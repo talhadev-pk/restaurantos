@@ -1,42 +1,48 @@
 import {
-  pgTable, serial, integer, text, boolean, timestamp, doublePrecision, jsonb, uniqueIndex, index,
-} from "drizzle-orm/pg-core";
+  sqliteTable, integer, real, text, uniqueIndex, index,
+} from "drizzle-orm/sqlite-core";
+
+// Timestamps are integer milliseconds (Date-typed); NOW columns default at insert time.
+const ts = (name: string) => integer(name, { mode: "timestamp_ms" });
+const tsNow = (name: string) => integer(name, { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date());
+const bool = (name: string) => integer(name, { mode: "boolean" });
+const boolTrue = (name: string) => integer(name, { mode: "boolean" }).notNull().default(true);
 
 // ---------- Auth / RBAC ----------
-export const roles = pgTable("roles", {
-  id: serial("id").primaryKey(),
+export const roles = sqliteTable("roles", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull().unique(),
-  permissions: jsonb("permissions").$type<string[]>().notNull().default([]),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  permissions: text("permissions", { mode: "json" }).$type<string[]>().notNull().$defaultFn(() => []),
+  createdAt: tsNow("created_at"),
 });
 
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
+export const users = sqliteTable("users", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   roleId: integer("role_id").notNull().references(() => roles.id),
-  active: boolean("active").notNull().default(true),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  active: boolTrue("active"),
+  createdAt: tsNow("created_at"),
 });
 
-export const sessions = pgTable("sessions", {
+export const sessions = sqliteTable("sessions", {
   token: text("token").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: tsNow("created_at"),
+  expiresAt: ts("expires_at").notNull(),
 });
 
-export const branches = pgTable("branches", {
-  id: serial("id").primaryKey(),
+export const branches = sqliteTable("branches", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   code: text("code").notNull().unique(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: tsNow("created_at"),
 });
 
 // ---------- Floor ----------
-export const restaurantTables = pgTable("restaurant_tables", {
-  id: serial("id").primaryKey(),
+export const restaurantTables = sqliteTable("restaurant_tables", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull().unique(),
   capacity: integer("capacity").notNull().default(2),
   status: text("status").notNull().default("available"), // available | occupied | reserved | cleaning
@@ -44,19 +50,19 @@ export const restaurantTables = pgTable("restaurant_tables", {
   posX: integer("pos_x").notNull().default(0),
   posY: integer("pos_y").notNull().default(0),
   branchId: integer("branch_id").references(() => branches.id),
-  active: boolean("active").notNull().default(true),
+  active: boolTrue("active"),
 }, (t) => [index("tables_status_idx").on(t.status)]);
 
 // ---------- Menu ----------
-export const categories = pgTable("categories", {
-  id: serial("id").primaryKey(),
+export const categories = sqliteTable("categories", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull().unique(),
   sortOrder: integer("sort_order").notNull().default(0),
-  active: boolean("active").notNull().default(true),
+  active: boolTrue("active"),
 });
 
-export const products = pgTable("products", {
-  id: serial("id").primaryKey(),
+export const products = sqliteTable("products", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   categoryId: integer("category_id").references(() => categories.id),
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
@@ -64,88 +70,88 @@ export const products = pgTable("products", {
   taxRateBp: integer("tax_rate_bp").notNull().default(850), // basis points, 850 = 8.5%
   sku: text("sku"),
   color: text("color").notNull().default("amber"),
-  available: boolean("available").notNull().default(true),
+  available: boolTrue("available"),
   branchId: integer("branch_id").references(() => branches.id),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: tsNow("created_at"),
+  updatedAt: tsNow("updated_at"),
 }, (t) => [index("products_category_idx").on(t.categoryId)]);
 
-export const productModifiers = pgTable("product_modifiers", {
-  id: serial("id").primaryKey(),
+export const productModifiers = sqliteTable("product_modifiers", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   productId: integer("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   priceDeltaCents: integer("price_delta_cents").notNull().default(0),
 });
 
 // ---------- Inventory & Recipes ----------
-export const ingredients = pgTable("ingredients", {
-  id: serial("id").primaryKey(),
+export const ingredients = sqliteTable("ingredients", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull().unique(),
   unit: text("unit").notNull().default("pcs"), // pcs | g | ml
-  stockQty: doublePrecision("stock_qty").notNull().default(0),
-  minStock: doublePrecision("min_stock").notNull().default(0),
+  stockQty: real("stock_qty").notNull().default(0),
+  minStock: real("min_stock").notNull().default(0),
   unitCostCents: integer("unit_cost_cents").notNull().default(0),
-  expiresAt: timestamp("expires_at", { withTimezone: true }),
-  active: boolean("active").notNull().default(true),
+  expiresAt: ts("expires_at"),
+  active: boolTrue("active"),
 });
 
-export const recipes = pgTable("recipes", {
-  id: serial("id").primaryKey(),
+export const recipes = sqliteTable("recipes", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   productId: integer("product_id").notNull().unique().references(() => products.id, { onDelete: "cascade" }),
   notes: text("notes").notNull().default(""),
 });
 
-export const recipeIngredients = pgTable("recipe_ingredients", {
-  id: serial("id").primaryKey(),
+export const recipeIngredients = sqliteTable("recipe_ingredients", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   recipeId: integer("recipe_id").notNull().references(() => recipes.id, { onDelete: "cascade" }),
   ingredientId: integer("ingredient_id").notNull().references(() => ingredients.id),
-  quantity: doublePrecision("quantity").notNull(),
+  quantity: real("quantity").notNull(),
 }, (t) => [uniqueIndex("recipe_ingredient_unique").on(t.recipeId, t.ingredientId)]);
 
-export const stockMovements = pgTable("stock_movements", {
-  id: serial("id").primaryKey(),
+export const stockMovements = sqliteTable("stock_movements", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   ingredientId: integer("ingredient_id").notNull().references(() => ingredients.id),
   type: text("type").notNull(), // purchase | consumption | adjustment | waste | refund_restore
-  quantity: doublePrecision("quantity").notNull(), // always positive; direction derived from type
+  quantity: real("quantity").notNull(), // always positive; direction derived from type
   unitCostCents: integer("unit_cost_cents"),
   referenceType: text("reference_type"), // order | purchase_order | manual | reset
   referenceId: integer("reference_id"),
   source: text("source").notNull().default("manual"), // manual | simulation
   note: text("note").notNull().default(""),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: tsNow("created_at"),
 }, (t) => [index("stock_movements_ingredient_idx").on(t.ingredientId), index("stock_movements_ref_idx").on(t.referenceType, t.referenceId)]);
 
 // ---------- Suppliers / Purchasing ----------
-export const suppliers = pgTable("suppliers", {
-  id: serial("id").primaryKey(),
+export const suppliers = sqliteTable("suppliers", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull().unique(),
   contactName: text("contact_name").notNull().default(""),
   email: text("email").notNull().default(""),
   phone: text("phone").notNull().default(""),
-  active: boolean("active").notNull().default(true),
+  active: boolTrue("active"),
 });
 
-export const purchaseOrders = pgTable("purchase_orders", {
-  id: serial("id").primaryKey(),
+export const purchaseOrders = sqliteTable("purchase_orders", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   supplierId: integer("supplier_id").notNull().references(() => suppliers.id),
   status: text("status").notNull().default("draft"), // draft | approved | partially_received | received | cancelled
   totalCostCents: integer("total_cost_cents").notNull().default(0),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  receivedAt: timestamp("received_at", { withTimezone: true }),
+  createdAt: tsNow("created_at"),
+  receivedAt: ts("received_at"),
 });
 
-export const purchaseOrderItems = pgTable("purchase_order_items", {
-  id: serial("id").primaryKey(),
+export const purchaseOrderItems = sqliteTable("purchase_order_items", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   orderId: integer("order_id").notNull().references(() => purchaseOrders.id, { onDelete: "cascade" }),
   ingredientId: integer("ingredient_id").notNull().references(() => ingredients.id),
-  quantity: doublePrecision("quantity").notNull(),
+  quantity: real("quantity").notNull(),
   unitCostCents: integer("unit_cost_cents").notNull().default(0),
-  receivedQty: doublePrecision("received_qty").notNull().default(0),
+  receivedQty: real("received_qty").notNull().default(0),
 });
 
 // ---------- Customers / Reservations ----------
-export const customers = pgTable("customers", {
-  id: serial("id").primaryKey(),
+export const customers = sqliteTable("customers", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   phone: text("phone").notNull().default(""),
   email: text("email").notNull().default(""),
@@ -153,48 +159,48 @@ export const customers = pgTable("customers", {
   loyaltyPoints: integer("loyalty_points").notNull().default(0),
   totalSpentCents: integer("total_spent_cents").notNull().default(0),
   visits: integer("visits").notNull().default(0),
-  isVirtual: boolean("is_virtual").notNull().default(false),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  isVirtual: bool("is_virtual").notNull().default(false),
+  createdAt: tsNow("created_at"),
 });
 
-export const reservations = pgTable("reservations", {
-  id: serial("id").primaryKey(),
+export const reservations = sqliteTable("reservations", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   customerId: integer("customer_id").references(() => customers.id),
   customerName: text("customer_name").notNull().default(""),
   tableId: integer("table_id").notNull().references(() => restaurantTables.id),
-  reservedFor: timestamp("reserved_for", { withTimezone: true }).notNull(),
+  reservedFor: ts("reserved_for").notNull(),
   partySize: integer("party_size").notNull().default(2),
   status: text("status").notNull().default("booked"), // booked | seated | completed | cancelled | no_show
   notes: text("notes").notNull().default(""),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: tsNow("created_at"),
 }, (t) => [index("reservations_table_time_idx").on(t.tableId, t.reservedFor)]);
 
 // ---------- Employees ----------
-export const employees = pgTable("employees", {
-  id: serial("id").primaryKey(),
+export const employees = sqliteTable("employees", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   position: text("position").notNull(),
   department: text("department").notNull().default("Operations"),
   roleId: integer("role_id").references(() => roles.id),
   hourlyRateCents: integer("hourly_rate_cents").notNull().default(1500),
   status: text("status").notNull().default("active"), // active | on_break | off_duty
-  isVirtual: boolean("is_virtual").notNull().default(true),
-  hiredAt: timestamp("hired_at", { withTimezone: true }).notNull().defaultNow(),
+  isVirtual: boolTrue("is_virtual"),
+  hiredAt: tsNow("hired_at"),
 });
 
-export const attendance = pgTable("attendance", {
-  id: serial("id").primaryKey(),
+export const attendance = sqliteTable("attendance", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   employeeId: integer("employee_id").notNull().references(() => employees.id),
   workDate: text("work_date").notNull(), // YYYY-MM-DD
-  checkIn: timestamp("check_in", { withTimezone: true }),
-  checkOut: timestamp("check_out", { withTimezone: true }),
+  checkIn: ts("check_in"),
+  checkOut: ts("check_out"),
   status: text("status").notNull().default("present"), // present | late | absent
   source: text("source").notNull().default("manual"), // manual | simulation
 }, (t) => [uniqueIndex("attendance_emp_date").on(t.employeeId, t.workDate)]);
 
 // ---------- Orders / Payments ----------
-export const orders = pgTable("orders", {
-  id: serial("id").primaryKey(),
+export const orders = sqliteTable("orders", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   orderNumber: text("order_number").notNull().unique(),
   type: text("type").notNull().default("dine_in"), // dine_in | takeaway | delivery
   status: text("status").notNull().default("pending"), // pending | confirmed | preparing | ready | served | completed | cancelled
@@ -205,85 +211,85 @@ export const orders = pgTable("orders", {
   discountCents: integer("discount_cents").notNull().default(0),
   totalCents: integer("total_cents").notNull().default(0),
   cogsCents: integer("cogs_cents").notNull().default(0),
-  inventoryDeducted: boolean("inventory_deducted").notNull().default(false),
+  inventoryDeducted: bool("inventory_deducted").notNull().default(false),
   source: text("source").notNull().default("manual"), // manual | simulation
   simulationSessionId: integer("simulation_session_id"),
   notes: text("notes").notNull().default(""),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-  completedAt: timestamp("completed_at", { withTimezone: true }),
+  createdAt: tsNow("created_at"),
+  updatedAt: tsNow("updated_at"),
+  completedAt: ts("completed_at"),
 }, (t) => [index("orders_status_idx").on(t.status), index("orders_created_idx").on(t.createdAt)]);
 
-export const orderItems = pgTable("order_items", {
-  id: serial("id").primaryKey(),
+export const orderItems = sqliteTable("order_items", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   orderId: integer("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
   productId: integer("product_id").references(() => products.id),
   productName: text("product_name").notNull(), // snapshot for historical integrity
   quantity: integer("quantity").notNull().default(1),
   unitPriceCents: integer("unit_price_cents").notNull(), // snapshot incl. modifiers per unit
   taxRateBp: integer("tax_rate_bp").notNull().default(0),
-  modifiers: jsonb("modifiers").$type<{ name: string; priceDeltaCents: number }[]>().notNull().default([]),
+  modifiers: text("modifiers", { mode: "json" }).$type<{ name: string; priceDeltaCents: number }[]>().notNull().$defaultFn(() => []),
   instructions: text("instructions").notNull().default(""),
 }, (t) => [index("order_items_order_idx").on(t.orderId)]);
 
-export const payments = pgTable("payments", {
-  id: serial("id").primaryKey(),
+export const payments = sqliteTable("payments", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   orderId: integer("order_id").notNull().unique().references(() => orders.id), // one settled payment per order (idempotency)
   amountCents: integer("amount_cents").notNull(),
   method: text("method").notNull().default("cash"), // cash | card | mobile
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: tsNow("created_at"),
 });
 
-export const refunds = pgTable("refunds", {
-  id: serial("id").primaryKey(),
+export const refunds = sqliteTable("refunds", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   orderId: integer("order_id").notNull().references(() => orders.id),
   amountCents: integer("amount_cents").notNull(),
   reason: text("reason").notNull().default(""),
-  inventoryRestored: boolean("inventory_restored").notNull().default(false),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  inventoryRestored: bool("inventory_restored").notNull().default(false),
+  createdAt: tsNow("created_at"),
 });
 
-export const expenses = pgTable("expenses", {
-  id: serial("id").primaryKey(),
+export const expenses = sqliteTable("expenses", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   category: text("category").notNull().default("general"), // rent | utilities | payroll | marketing | equipment | general
   description: text("description").notNull().default(""),
   amountCents: integer("amount_cents").notNull(),
-  incurredAt: timestamp("incurred_at", { withTimezone: true }).notNull().defaultNow(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  incurredAt: tsNow("incurred_at"),
+  createdAt: tsNow("created_at"),
 });
 
 // ---------- Simulation ----------
-export const simulationSessions = pgTable("simulation_sessions", {
-  id: serial("id").primaryKey(),
+export const simulationSessions = sqliteTable("simulation_sessions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   mode: text("mode").notNull().default("automatic"), // assisted | automatic | stress
   status: text("status").notNull().default("running"), // running | paused | stopped | completed
-  speed: doublePrecision("speed").notNull().default(1),
-  config: jsonb("config").$type<Record<string, unknown>>().notNull().default({}),
-  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
-  endedAt: timestamp("ended_at", { withTimezone: true }),
+  speed: real("speed").notNull().default(1),
+  config: text("config", { mode: "json" }).$type<Record<string, unknown>>().notNull().$defaultFn(() => ({})),
+  startedAt: tsNow("started_at"),
+  endedAt: ts("ended_at"),
 });
 
-export const simulationEvents = pgTable("simulation_events", {
-  id: serial("id").primaryKey(),
+export const simulationEvents = sqliteTable("simulation_events", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   sessionId: integer("simulation_session_id"),
   eventType: text("event_type").notNull().default("info"),
   message: text("message").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: tsNow("created_at"),
 }, (t) => [index("sim_events_created_idx").on(t.createdAt)]);
 
 // ---------- System ----------
-export const auditLogs = pgTable("audit_logs", {
-  id: serial("id").primaryKey(),
+export const auditLogs = sqliteTable("audit_logs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id"),
   userName: text("user_name").notNull().default("system"),
   action: text("action").notNull(),
   entity: text("entity").notNull(),
   entityId: integer("entity_id"),
-  details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  details: text("details", { mode: "json" }).$type<Record<string, unknown>>().notNull().$defaultFn(() => ({})),
+  createdAt: tsNow("created_at"),
 }, (t) => [index("audit_created_idx").on(t.createdAt)]);
 
-export const settings = pgTable("settings", {
+export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull().default(""),
 });

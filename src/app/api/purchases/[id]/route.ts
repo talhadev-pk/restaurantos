@@ -15,7 +15,6 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     const action = String(body.action ?? "");
 
     const updated = await db.transaction(async (tx) => {
-      await tx.execute(sql`SELECT id FROM purchase_orders WHERE id = ${id} FOR UPDATE`);
       const [po] = await tx.select().from(s.purchaseOrders).where(eq(s.purchaseOrders.id, id));
       if (!po) throw new ServiceError("Purchase order not found.", 404);
 

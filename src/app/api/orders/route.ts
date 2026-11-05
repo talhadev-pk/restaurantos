@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
         order: s.orders,
         tableName: s.restaurantTables.name,
         customerName: s.customers.name,
-        itemCount: sql<number>`(select count(*)::int from order_items oi where oi.order_id = ${s.orders.id})`,
+        itemCount: sql<number>`(select count(*) from order_items oi where oi.order_id = ${s.orders.id})`,
       })
       .from(s.orders)
       .leftJoin(s.restaurantTables, eq(s.orders.tableId, s.restaurantTables.id))

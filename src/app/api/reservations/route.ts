@@ -45,13 +45,13 @@ export async function POST(req: NextRequest) {
       if (!table) throw new ServiceError("Table not found.", 404);
       if (partySize > table.capacity) throw new ServiceError(`Table ${table.name} seats ${table.capacity} — party of ${partySize} won't fit.`, 422);
       // Conflict prevention within ±2h for active reservations
-      const clash = await tx.execute(sql`
+      const clash = await tx.all(sql`
         SELECT id, reserved_for FROM reservations
         WHERE table_id = ${tableId} AND status IN ('booked','seated')
-          AND reserved_for BETWEEN ${new Date(when.getTime() - WINDOW_MS)} AND ${new Date(when.getTime() + WINDOW_MS)}
+          AND reserved_for BETWEEN ${when.getTime() - WINDOW_MS} AND ${when.getTime() + WINDOW_MS}
         LIMIT 1
       `);
-      if (clash.rows.length) {
+      if (clash.length) {
         throw new ServiceError("This table already has a reservation within two hours of that time.", 409);
       }
       const [row] = await tx.insert(s.reservations).values({

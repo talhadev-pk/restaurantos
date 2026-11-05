@@ -7,4 +7,7 @@ out/
 *.log
 .DS_Store
 Thumbs.db
+local.db*
+*.db-shm
+*.db-wal
 drizzle/

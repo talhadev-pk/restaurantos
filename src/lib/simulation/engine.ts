@@ -151,7 +151,7 @@ class SimulationEngine {
         await tx.delete(s.orders).where(inArray(s.orders.id, ids));
       }
       // free any tables still marked occupied by simulation
-      await tx.execute(sql`UPDATE restaurant_tables SET status = 'available' WHERE status IN ('occupied','cleaning')`);
+      await tx.update(s.restaurantTables).set({ status: "available" }).where(inArray(s.restaurantTables.status, ["occupied", "cleaning"]));
       await tx.delete(s.simulationEvents).where(sql`true`);
       await tx.update(s.simulationSessions).set({ status: "stopped", endedAt: new Date() }).where(eq(s.simulationSessions.status, "running"));
       return { ordersRemoved: ids.length, inventoryRestored: moves.length };
@@ -298,7 +298,7 @@ class SimulationEngine {
       if (Date.now() >= this.nextArrivalAt) {
         if (this.mode === "stress") {
           const active = await db
-            .select({ c: sql<number>`count(*)::int` })
+            .select({ c: sql<number>`count(*)` })
             .from(s.orders)
             .where(inArray(s.orders.status, ["confirmed", "preparing", "ready"]));
           if (Number(active[0].c) < 40) {
@@ -324,7 +324,7 @@ class SimulationEngine {
     const recent = await db.select().from(s.simulationEvents).orderBy(desc(s.simulationEvents.id)).limit(40);
     const activeOrders = this.sessionId
       ? await db
-          .select({ status: s.orders.status, c: sql<number>`count(*)::int` })
+          .select({ status: s.orders.status, c: sql<number>`count(*)` })
           .from(s.orders)
           .where(eq(s.orders.simulationSessionId, this.sessionId))
           .groupBy(s.orders.status)

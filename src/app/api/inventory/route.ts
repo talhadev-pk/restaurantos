@@ -20,15 +20,15 @@ export async function GET() {
       .orderBy(desc(s.stockMovements.id))
       .limit(40);
     const valuation = ingredients.reduce((a, i) => a + Math.round(i.stockQty * i.unitCostCents), 0);
-    const wasteCost = await db.execute(sql`
-      SELECT coalesce(sum(quantity * unit_cost_cents),0)::int AS cost
+    const wasteRows = (await db.all(sql`
+      SELECT coalesce(sum(quantity * unit_cost_cents),0) AS cost
       FROM stock_movements WHERE type = 'waste'
-    `);
+    `)) as { cost: number }[];
     return NextResponse.json({
       ingredients: ingredients.map((i) => ({ ...i, low: i.stockQty <= i.minStock })),
       movements,
       valuation,
-      wasteCostCents: Number((wasteCost.rows[0] as { cost: number })?.cost ?? 0),
+      wasteCostCents: Number(wasteRows[0]?.cost ?? 0),
       allowNegativeStock: (await getSetting("allowNegativeStock", "false")) === "true",
     });
   } catch (e) {
@@ -69,7 +69,6 @@ export async function POST(req: NextRequest) {
     const note = String(body.note ?? "").slice(0, 200);
 
     const result = await db.transaction(async (tx) => {
-      await tx.execute(sql`SELECT id FROM ingredients WHERE id = ${ingredientId} FOR UPDATE`);
       const [ing] = await tx.select().from(s.ingredients).where(eq(s.ingredients.id, ingredientId));
       if (!ing) throw new ServiceError("Ingredient not found.", 404);
       if (action === "adjust" || action === "restock") {

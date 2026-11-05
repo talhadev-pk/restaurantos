@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
       .where(and(eq(s.orders.status, "completed"), gte(s.orders.completedAt, from), lte(s.orders.completedAt, to)));
 
     const refundsInRange = await db
-      .select({ c: sql<number>`coalesce(sum(${s.refunds.amountCents}),0)::int` })
+      .select({ c: sql<number>`coalesce(sum(${s.refunds.amountCents}),0)` })
       .from(s.refunds)
       .where(and(gte(s.refunds.createdAt, from), lte(s.refunds.createdAt, to)));
 
@@ -61,18 +61,18 @@ export async function GET(req: NextRequest) {
     const trend = [...trendMap.entries()].sort().map(([date, v]) => ({ date, revenue: v.revenue, orders: v.orders }));
 
     // Popular items
-    const topItems = await db.execute(sql`
-      SELECT oi.product_name AS name, SUM(oi.quantity)::int AS qty,
-             SUM(oi.quantity * oi.unit_price_cents)::int AS revenue
+    const topRows = (await db.all(sql`
+      SELECT oi.product_name AS name, CAST(SUM(oi.quantity) AS INTEGER) AS qty,
+             CAST(SUM(oi.quantity * oi.unit_price_cents) AS INTEGER) AS revenue
       FROM order_items oi
       JOIN orders o ON o.id = oi.order_id
-      WHERE o.status = 'completed' AND o.completed_at >= ${from} AND o.completed_at <= ${to}
+      WHERE o.status = 'completed' AND o.completed_at >= ${from.getTime()} AND o.completed_at <= ${to.getTime()}
       GROUP BY oi.product_name ORDER BY qty DESC LIMIT 6
-    `);
+    `)) as { name: string; qty: number; revenue: number }[];
 
     // Live status distribution (open orders right now)
     const statusDist = await db
-      .select({ status: s.orders.status, c: sql<number>`count(*)::int` })
+      .select({ status: s.orders.status, c: sql<number>`count(*)` })
       .from(s.orders)
       .groupBy(s.orders.status);
 
@@ -100,10 +100,10 @@ export async function GET(req: NextRequest) {
 
     // Customer activity in range
     const newCustomers = await db
-      .select({ c: sql<number>`count(*)::int` })
+      .select({ c: sql<number>`count(*)` })
       .from(s.customers)
       .where(and(gte(s.customers.createdAt, from), lte(s.customers.createdAt, to)));
-    const totalCustomers = await db.select({ c: sql<number>`count(*)::int` }).from(s.customers);
+    const totalCustomers = await db.select({ c: sql<number>`count(*)` }).from(s.customers);
 
     // Recent orders feed
     const recentOrders = await db
@@ -142,7 +142,7 @@ export async function GET(req: NextRequest) {
         inventoryValuation: valuation,
       },
       trend,
-      topItems: (topItems.rows as { name: string; qty: number; revenue: number }[]) ?? [],
+      topItems: topRows ?? [],
       statusDist: Object.fromEntries(statusDist.map((r) => [r.status, Number(r.c)])),
       recentTransactions,
       recentOrders,

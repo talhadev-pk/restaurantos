@@ -14,33 +14,32 @@ RestaurantOS runs a complete virtual restaurant: POS, kitchen display, floor & t
 | Layer | Tech |
 | --- | --- |
 | Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, Framer Motion, Recharts, Lucide |
-| Backend | Next.js Route Handlers (Node runtime), libpq-backed PostgreSQL driver |
-| Database | PostgreSQL via Drizzle ORM (relational, transactional, FK + unique constraints + indexes) |
+| Backend | Next.js Route Handlers (Node runtime) |
+| Database | **Local SQLite file** (`local.db`) via Drizzle ORM + @libsql/client — zero setup, no external database |
 | Auth | scrypt password hashing, DB-backed sessions (httpOnly cookie), role-based permissions enforced on the server |
-| Simulation | Server-side engine singleton (`src/lib/simulation/engine.ts`) with 750ms tick loop |
+| Simulation | Server-side engine singleton (`src/lib/simulation/engine.ts`) with tick loop + request-driven pump |
 
 ## Quick Start (Windows 11 / PowerShell)
 
-Prerequisites: Node.js 20+, a local or hosted PostgreSQL 14+.
+Prerequisite: **Node.js 20+** only. No database server, no Docker, no accounts.
 
 ```powershell
 # 1. Install dependencies
 npm install
 
-# 2. Configure environment
-Copy-Item .env.example .env
-# edit .env -> DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app_db
-
-# 3. Push schema (dev)
-npx drizzle-kit push
-
-# 4. Seed demo data (roles, menu, recipes, stock, staff, ~120 real historical orders)
-npx tsx src/db/seed.ts
-
-# 5. Run
+# 2. Run — done!
 npm run dev     # development on http://localhost:3000
-# or production:
-npm run build; npm run start
+```
+
+The first run automatically creates `local.db` (all 26 tables) and seeds the demo
+restaurant (menu, recipes, stock, suppliers, virtual staff, ~120 real historical
+orders). Nothing else to configure.
+
+```powershell
+npm run build; npm run start   # production mode
+
+# Optional: wipe + reseed demo data at any time
+npx tsx src/db/seed.ts
 ```
 
 Sign in: **talhamalikawan@example.com** / **demo1234** (Administrator).
@@ -69,6 +68,7 @@ src/
 
 - **Exactly-once deduction**: inventory is consumed only at order completion, inside a transaction guarded by `SELECT ... FOR UPDATE` + `inventory_deducted` flag. Duplicate completes are rejected (409).
 - **Exactly-once payment**: unique constraint on `payments.order_id`.
+- **Zero-setup local database**: SQLite file auto-created and auto-seeded at first boot (`src/db/index.ts` + `src/instrumentation.ts`).
 - **Negative stock** is blocked transactionally unless the audited override (`allowNegativeStock`) is enabled in Settings.
 - **Refunds** restore consumed inventory (`refund_restore` movements) and never double-count.
 - **Historical integrity**: order items snapshot name/price/tax; recipe edits only affect future orders.

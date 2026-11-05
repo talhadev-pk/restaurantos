@@ -10,7 +10,7 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 // ---------- helpers ----------
 async function generateOrderNumber(tx: Tx): Promise<string> {
-  const [{ c }] = await tx.select({ c: sql<number>`count(*)::int` }).from(s.orders);
+  const [{ c }] = await tx.select({ c: sql<number>`count(*)` }).from(s.orders);
   const rand = Math.floor(100 + Math.random() * 900);
   return `ROS-${1000 + Number(c) + 1}-${rand}`;
 }
@@ -278,8 +278,7 @@ export async function transitionOrder(
 ) {
   const allowNegative = (await getSetting("allowNegativeStock", "false")) === "true";
   const result = await db.transaction(async (tx) => {
-    // Row-level lock — idempotency for concurrent completions.
-    await tx.execute(sql`SELECT id FROM orders WHERE id = ${orderId} FOR UPDATE`);
+    // SQLite serializes writers in-process; re-read inside the transaction for idempotency.
     const [order] = await tx.select().from(s.orders).where(eq(s.orders.id, orderId));
     if (!order) throw new ServiceError("Order not found.", 404);
 
