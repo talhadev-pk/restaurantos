@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+*.db
+local.db*
+*.db-shm
+*.db-wal
+.env
+*.log
+restaurantos.zip
+drizzle
